@@ -5,6 +5,7 @@ gitbranch() {
   if [ $branch_id ]
   then
     printf $branch_id
+    printf " "
   fi
 }
 
@@ -229,4 +230,15 @@ center_string() {
   local string="$1"
   local padding=$(( ($(tput cols) - ${#string}) / 2))
   printf '%*s%s%*s\n' $padding '' "$string" $padding ''
+}
+
+fetch_weather_data() {
+    WEATHER_FILE="/tmp/weather_data_001.txt"
+    while true; do
+        WEATHER_DATA=$(curl -s 'https://weatherapi.pelmorex.com/api/v1/observation/placecode/caqc0313?locale=fr-ca&unit=metric')
+        TEMPERATURE=$(echo "$WEATHER_DATA" | python -c "import sys, json; print(json.load(sys.stdin)['observation']['temperature'])")
+        WEATHER_DESC=$(echo "$WEATHER_DATA" | python -c "import sys, json; print(json.load(sys.stdin)['observation']['weatherCode']['text'])")
+        echo "$TEMPERATURE $WEATHER_DESC" > "$WEATHER_FILE"
+        sleep 30
+    done
 }
