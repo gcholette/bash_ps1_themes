@@ -3,13 +3,47 @@ scriptDir=$(dirname -- "$(readlink -f -- "$BASH_SOURCE")")
 source $scriptDir'/../lib/lib'
 prepare_colors
 
-prompt_cmd() {
-  DATETIME_1="$(long_date) $(short_time)"
-  LINE_1="$(rgb_bg $palette_variant_1) $(no_color) $(rgb_gradient $palette_gradient_start $palette_gradient_end $(current_user)@$HOSTNAME)$(rgb_fg $palette_accent) >> $(rgb_gradient $palette_gradient_start $palette_gradient_end $(dirs)) "
-  LINE_2="$(rgb_bg $palette_variant_2) $(no_color) $(rgb_gradient $palette_gradient_start $palette_gradient_end $DATETIME_1) $(rgb_fg $palette_accent)$(gitbranch)"
-  LINE_3="$(rgb_bg $palette_variant_3) $(no_color) $(rgb_fg $palette_accent)$ $(rgb_fg $palette_text)"
+gadd() {
+  git add $@ && git status
+}
 
-  PS1="\r\n${LINE_1}\r\n${LINE_2}\r\n${LINE_3}"
+fetch_weather_data() {
+    WEATHER_FILE="/tmp/weather_data_001.txt"
+    while true; do
+        WEATHER_DATA=$(curl -s 'https://weatherapi.pelmorex.com/api/v1/observation/placecode/caqc0313?locale=fr-ca&unit=metric')
+        TEMPERATURE=$(echo "$WEATHER_DATA" | python -c "import sys, json; print(json.load(sys.stdin)['observation']['temperature'])")
+        WEATHER_DESC=$(echo "$WEATHER_DATA" | python -c "import sys, json; print(json.load(sys.stdin)['observation']['weatherCode']['text'])")
+        echo "$TEMPERATURE $WEATHER_DESC" > "$WEATHER_FILE"
+        sleep 30
+    done
+}
+
+prefix_command() {
+    if [ -n "$BASH_COMMAND" ] && [ "$BASH_COMMAND" != "$PROMPT_COMMAND" ]; then
+        clear -x
+        echo
+        echo
+        echo
+    fi
+}
+
+trap 'prefix_command' DEBUG
+
+fetch_weather_data &
+
+prompt_cmd() {
+
+    WEATHER_FILE="/tmp/weather_data_001.txt"
+    if [ -f "$WEATHER_FILE" ]; then
+        WEATHER_DATA=$(cat "$WEATHER_FILE")
+        TEMPERATURE=$(echo "$WEATHER_DATA" | awk '{print $1}')
+        WEATHER_DESC=$(echo "$WEATHER_DATA" | awk '{print $2}')
+    fi
+    DATETIME_1="$(short_date) $(short_time)"
+    LINE_1="$(rgb_bg $palette_variant_1) $(no_color) $(rgb_gradient $palette_gradient_start $palette_gradient_end $(current_user)@$HOSTNAME)$(rgb_fg $palette_accent) >> $(rgb_gradient $palette_gradient_start $palette_gradient_end $(basename $PWD)) "
+    LINE_2="$(rgb_bg $palette_variant_2) $(no_color) $(rgb_gradient $palette_gradient_start $palette_gradient_end $DATETIME_1) $(rgb_fg $palette_accent)$(gitbranch) $(rgb_fg $palette_secondary)$TEMPERATURE $WEATHER_DESC"
+    LINE_3="$(rgb_bg $palette_variant_3) $(no_color) $(rgb_fg $palette_accent)$ $(rgb_fg $palette_text)"
+    PS1="\[\e[$(( $LINES - 3));0H\]\r\n\r\n\r\n\r\n${LINE_1}\r\n${LINE_2}\r\n${LINE_3}"
 }
 
 export PROMPT_COMMAND='prompt_cmd'
